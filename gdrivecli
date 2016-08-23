@@ -1,0 +1,224 @@
+#!/usr/bin/env python
+
+import cmd
+
+from drive_functions import debug_info, change_dir, change_space, list, list_shared_folders
+
+class GDriveShell(cmd.Cmd):
+
+    intro = '\nWelcome to GDriveShell. Type "help" for help.\n'
+    space = 'drive'
+    default_path = ['']
+    path = ['']
+    default_prompt = 'GDrive:{0}:/{1} $ '
+    prompt = default_prompt.format(space, '') #default_prompt.format('/'.join(path))
+
+
+
+    #
+    # overrides
+    #
+
+    def default(self, line):
+        print('Unknown command: {0}'.format(line))
+
+
+    def do_EOF(self, line):
+        print('')
+        return True
+
+    #def preloop(self):
+    #    self.cwd_subdirs = fetch_subdirs()
+
+
+    #
+    # commands
+    #
+
+    def do_debug(self, line):
+        dinfo = debug_info()
+        
+        print('self.path: {0}'.format(self.path))
+        print('path: {0}'.format(dinfo['path']))
+        print('conn: {0}'.format(dinfo['conn']))
+        print('cwd_subdirs: {0}'.format(dinfo['cwd_subdirs']))
+        print('subdir_map: {0}'.format(dinfo['subdir_map']))
+        print('self.space: {0}'.format(self.space))
+
+
+    def do_cd(self, line):
+
+        if (len(line) < 1):
+            print('too few arguments')
+        else:
+            try:
+                self.path = change_dir(line)
+                self.prompt = self.default_prompt.format(self.space, '/'.join(self.path[1:]))
+            except:
+                print('no such directory')
+
+
+    def do_cp(self, line):
+        args = line.split(' ')
+        if (len(args) < 2):
+            print('too few arguments')
+        else:
+            print('copying {0} to {1}'.format(args[0], args[1]))
+
+
+    def do_cs(self, line):
+        if (len(line) < 1):
+            print('missing argument')
+        else:
+            if(change_space(line)):
+               self.space = line
+               self.path = self.default_path
+               self.prompt = self.default_prompt.format(self.space, '/'.join(self.path))
+            else:
+                print('no such space')
+               
+
+    def do_ls_dev(self, line):
+        res = list_shared_folders().get('files',[])
+        res = sorted(res, key=lambda x: x['name'].lower())
+
+        print('total {0}'.format(len(res)))
+        for el in res:
+            print('{0}  {1}  {2}  {3}'
+                  .format(el['owners'][0]['displayName'], el['modifiedTime'],
+                          el.get('size',0), el['name']))
+
+
+    def do_ln(self, line):
+        #
+        # vnd.google-apps.symlink
+        #
+        
+        args = line.split(' ')
+        if (len(args) < 2):
+            print('too few arguments')
+        else:
+            print('linking {0} to {1}'.format(args[0], args[1]))
+                
+    def do_ls(self, line):
+        def encode_misc_attribs(file):
+            retval = []
+            ftype_map = {'application/vnd.google-apps.folder':'d',
+
+                         'application/vnd.google-apps.document':'G',
+                         'application/vnd.google-apps.drawing':'G',
+                         'application/vnd.google-apps.form':'G',
+                         'application/vnd.google-apps.fusiontable':'G',
+                         'application/vnd.google-apps.map':'G',
+                         'application/vnd.google-apps.spreadsheet':'G',
+
+                         'application/msword':'o',
+                         'application/vnd.ms-powerpoint':'o',
+
+                         'application/octet-stream':'x',
+                         'application/zip':'x',
+                         'application/pdf':'x',
+
+                         'audio/ogg':'a',
+                         'audio/mpeg':'a',
+
+                         'image/jpeg':'i',
+                         'image/gif':'i',
+
+                         'video/mp4':'v',
+
+                         'text/csv;charset=UTF-8':'t',
+                         'text/xml':'t'}
+
+
+
+            if (el.get('mimeType', False)):
+                retval.append(ftype_map.get(el['mimeType'],'-'))
+            else:
+                retval.append('-')
+
+            if (el['shared']):
+                retval.append('s')
+            else:
+                retval.append('-')
+
+            retval.append('-')
+
+            return retval
+
+
+        max_len_size = 1
+        max_len_owner = 1
+        res = None
+
+        #if (line):
+        res = list(self.path[-1], line)
+        if (len(self.path) == 1):
+            #print('poke')
+            shared = list_shared_folders().get('files',[])
+            res = res + shared
+        #else:
+        #    res = list(self.path[-1]).get('files',[])
+
+        res = sorted(res, key=lambda x: x['name'].lower())
+
+        for el in res:
+            if (len(el.get('size','0')) > max_len_size):
+                max_len_size = len(el.get('size','0'))
+
+            if (len(el['owners'][0]['displayName']) > max_len_owner):
+                max_len_owner = len(el['owners'][0]['displayName'])
+
+        print('total {0}'.format(len(res)))
+        for el in res:
+            misc = encode_misc_attribs(el)
+            print('{0}{1}{2}  {3:<{max_len_o}}  {4}  {5:>{max_len_s}}  {6}'
+                  .format(*misc, el['owners'][0]['displayName'], el['modifiedTime'],
+                          el.get('size',0), el['name'], max_len_s=max_len_size, max_len_o=max_len_owner))
+
+
+    def do_mkdir(self, line):
+        args = line.split(' ')
+        if (len(args) < 1):
+            print('too few arguments')
+        else:
+            print('creating directory {0}'.format(args[0]))
+
+
+    def do_mv(self, line):
+        args = line.split(' ')
+        if (len(args) < 2):
+            print('too few arguments')
+        else:
+            print('moving {0} to {1}'.format(args[0], args[1]))
+
+    def do_rename(self, line):
+        args = line.split(' ')
+        if (len(args) < 2):
+            print('too few arguments')
+        else:
+            print('renaming {0} to {1}'.format(args[0], args[1]))
+
+    def do_rmdir(self, line):
+        args = line.split(' ')
+        if (len(args) < 1):
+            print('too few arguments')
+        else:
+            print('removing directory {0}'.format(args[0]))
+
+
+    #def do_inspect_file(self, line):
+        
+
+    def do_quit(self, line):
+        return True
+
+
+    def do_exit(self, line):
+        return True
+
+
+
+if __name__ == '__main__':
+    GDriveShell().cmdloop()
+    

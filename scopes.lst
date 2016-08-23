@@ -1,0 +1,10 @@
+Drive API, v3
+Scope	Description
+https://www.googleapis.com/auth/drive	                View and manage the files in your Google Drive
+https://www.googleapis.com/auth/drive.appdata	        View and manage its own configuration data in your Google Drive
+https://www.googleapis.com/auth/drive.file	        View and manage Google Drive files and folders that you have opened or created with this app
+https://www.googleapis.com/auth/drive.metadata	        View and manage metadata of files in your Google Drive
+https://www.googleapis.com/auth/drive.metadata.readonly	View metadata for files in your Google Drive
+https://www.googleapis.com/auth/drive.photos.readonly	View the photos, videos and albums in your Google Photos
+https://www.googleapis.com/auth/drive.readonly	        View the files in your Google Drive
+https://www.googleapis.com/auth/drive.scripts	        Modify your Google Apps Script scripts' behavior
