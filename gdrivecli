@@ -1,12 +1,15 @@
 #!/usr/bin/env python
 
 import cmd
+from collections import defaultdict, namedtuple
+
+from colorama import Back, Fore, init
 
 from drive_functions import debug_info, change_dir, change_space, list, list_shared_folders
 
 class GDriveShell(cmd.Cmd):
 
-    intro = '\nWelcome to GDriveShell. Type "help" for help.\n'
+    intro = Fore.RESET + '\nWelcome to GDriveShell. Type "help" for help.\n'
     space = 'drive'
     default_path = ['']
     path = ['']
@@ -27,7 +30,11 @@ class GDriveShell(cmd.Cmd):
         print('')
         return True
 
-    #def preloop(self):
+    def emptyline(self):
+        pass
+
+    def preloop(self):
+        init()
     #    self.cwd_subdirs = fetch_subdirs()
 
 
@@ -101,39 +108,59 @@ class GDriveShell(cmd.Cmd):
             print('linking {0} to {1}'.format(args[0], args[1]))
                 
     def do_ls(self, line):
+        FAttributes = namedtuple('FAttributes', ['attrib_char','colour'])
+
+        fattrs = defaultdict(lambda: FAttributes('-',''),
+                             {'folder':FAttributes('d',Fore.BLUE),
+                              'gdocs':FAttributes('g',Fore.WHITE),
+                              'office':FAttributes('o',''),
+                              'misc':FAttributes('x',''),
+                              'audio':FAttributes('a',Fore.YELLOW),
+                              'image':FAttributes('i',Fore.RED),
+                              'video':FAttributes('v',Fore.GREEN),
+                              'text':FAttributes('t',Fore.CYAN)})
+
+        mime_to_attrib_map = defaultdict(lambda: '-',
+                                         {'application/vnd.google-apps.folder':fattrs['folder'],
+
+                                          'application/vnd.google-apps.document':fattrs['google'],
+                                          'application/vnd.google-apps.drawing':fattrs['google'],
+                                          'application/vnd.google-apps.form':fattrs['google'],
+                                          'application/vnd.google-apps.fusiontable':fattrs['google'],
+                                          'application/vnd.google-apps.map':fattrs['google'],
+                                          'application/vnd.google-apps.spreadsheet':fattrs['google'],
+
+                                          'application/msword':fattrs['office'],
+                                          'application/vnd.ms-powerpoint':fattrs['office'],
+
+                                          'application/octet-stream':fattrs['misc'],
+                                          'application/zip':fattrs['misc'],
+                                          'application/pdf':fattrs['misc'],
+
+                                          'audio/ogg':fattrs['audio'],
+                                          'audio/mpeg':fattrs['audio'],
+
+                                          'image/jpeg':fattrs['image'],
+                                          'image/gif':fattrs['image'],
+
+                                          'video/mp4':fattrs['video'],
+
+                                          'text/csv;charset=UTF-8':fattrs['text'],
+                                          'text/xml':fattrs['text']})
+
+        def add_colour(mime_type, name):
+
+            if (mime_to_attrib_map.get(mime_type, None)):
+                return mime_to_attrib_map[mime_type].colour + name + Fore.RESET
+            else:
+                return name
+
+
         def encode_misc_attribs(file):
             retval = []
-            ftype_map = {'application/vnd.google-apps.folder':'d',
-
-                         'application/vnd.google-apps.document':'G',
-                         'application/vnd.google-apps.drawing':'G',
-                         'application/vnd.google-apps.form':'G',
-                         'application/vnd.google-apps.fusiontable':'G',
-                         'application/vnd.google-apps.map':'G',
-                         'application/vnd.google-apps.spreadsheet':'G',
-
-                         'application/msword':'o',
-                         'application/vnd.ms-powerpoint':'o',
-
-                         'application/octet-stream':'x',
-                         'application/zip':'x',
-                         'application/pdf':'x',
-
-                         'audio/ogg':'a',
-                         'audio/mpeg':'a',
-
-                         'image/jpeg':'i',
-                         'image/gif':'i',
-
-                         'video/mp4':'v',
-
-                         'text/csv;charset=UTF-8':'t',
-                         'text/xml':'t'}
-
-
 
             if (el.get('mimeType', False)):
-                retval.append(ftype_map.get(el['mimeType'],'-'))
+                retval.append(mime_to_attrib_map[el['mimeType']].attrib_char)
             else:
                 retval.append('-')
 
@@ -172,9 +199,10 @@ class GDriveShell(cmd.Cmd):
         print('total {0}'.format(len(res)))
         for el in res:
             misc = encode_misc_attribs(el)
+            f_name = add_colour(el['mimeType'], el['name'])
             print('{0}{1}{2}  {3:<{max_len_o}}  {4}  {5:>{max_len_s}}  {6}'
                   .format(*misc, el['owners'][0]['displayName'], el['modifiedTime'],
-                          el.get('size',0), el['name'], max_len_s=max_len_size, max_len_o=max_len_owner))
+                          el.get('size',0), f_name, max_len_s=max_len_size, max_len_o=max_len_owner))
 
 
     def do_mkdir(self, line):
