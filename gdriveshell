@@ -2,10 +2,12 @@
 
 import cmd
 from collections import defaultdict, namedtuple
+from pprint import pprint
 
 from colorama import Back, Fore, init
 
-from drive_functions import debug_info, change_dir, change_space, list, list_shared_folders
+from drive_functions import debug_info, change_dir, change_space, list, \
+                            list_shared_folders, make_directory, rename_file
 
 class GDriveShell(cmd.Cmd):
 
@@ -45,12 +47,12 @@ class GDriveShell(cmd.Cmd):
     def do_debug(self, line):
         dinfo = debug_info()
         
-        print('self.path: {0}'.format(self.path))
-        print('path: {0}'.format(dinfo['path']))
-        print('conn: {0}'.format(dinfo['conn']))
-        print('cwd_subdirs: {0}'.format(dinfo['cwd_subdirs']))
-        print('subdir_map: {0}'.format(dinfo['subdir_map']))
-        print('self.space: {0}'.format(self.space))
+        pprint('self.path: {0}'.format(self.path))
+        pprint('path: {0}'.format(dinfo['path']))
+        pprint('conn: {0}'.format(dinfo['conn']))
+        pprint('cwd_subdirs: {0}'.format(dinfo['cwd_subdirs']))
+        pprint('subdir_map: {0}'.format(dinfo['subdir_map']))
+        pprint('self.space: {0}'.format(self.space))
 
 
     def do_cd(self, line):
@@ -106,52 +108,53 @@ class GDriveShell(cmd.Cmd):
             print('too few arguments')
         else:
             print('linking {0} to {1}'.format(args[0], args[1]))
-                
+
+
     def do_ls(self, line):
         FAttributes = namedtuple('FAttributes', ['attrib_char','colour'])
 
-        fattrs = defaultdict(lambda: FAttributes('-',''),
-                             {'folder':FAttributes('d',Fore.BLUE),
-                              'gdocs':FAttributes('g',Fore.WHITE),
-                              'office':FAttributes('o',''),
-                              'misc':FAttributes('x',''),
-                              'audio':FAttributes('a',Fore.YELLOW),
-                              'image':FAttributes('i',Fore.RED),
-                              'video':FAttributes('v',Fore.GREEN),
-                              'text':FAttributes('t',Fore.CYAN)})
+        fattrs = {'folder':FAttributes('d',Fore.BLUE),
+                  'google':FAttributes('g',Fore.WHITE),
+                  'office':FAttributes('o',''),
+                  'misc':FAttributes('x',''),
+                  'audio':FAttributes('a',Fore.YELLOW),
+                  'image':FAttributes('i',Fore.RED),
+                  'video':FAttributes('v',Fore.GREEN),
+                  'text':FAttributes('t',Fore.CYAN)}
 
-        mime_to_attrib_map = defaultdict(lambda: '-',
-                                         {'application/vnd.google-apps.folder':fattrs['folder'],
+        attrib_map = defaultdict(lambda: FAttributes('-',''),
+                                 {'application/vnd.google-apps.folder':fattrs['folder'],
 
-                                          'application/vnd.google-apps.document':fattrs['google'],
-                                          'application/vnd.google-apps.drawing':fattrs['google'],
-                                          'application/vnd.google-apps.form':fattrs['google'],
-                                          'application/vnd.google-apps.fusiontable':fattrs['google'],
-                                          'application/vnd.google-apps.map':fattrs['google'],
-                                          'application/vnd.google-apps.spreadsheet':fattrs['google'],
+                                  'application/vnd.google-apps.document':fattrs['google'],
+                                  'application/vnd.google-apps.drawing':fattrs['google'],
+                                  'application/vnd.google-apps.form':fattrs['google'],
+                                  'application/vnd.google-apps.fusiontable':fattrs['google'],
+                                  'application/vnd.google-apps.map':fattrs['google'],
+                                  'application/vnd.google-apps.spreadsheet':fattrs['google'],
 
-                                          'application/msword':fattrs['office'],
-                                          'application/vnd.ms-powerpoint':fattrs['office'],
+                                  'application/msword':fattrs['office'],
+                                  'application/vnd.ms-powerpoint':fattrs['office'],
 
-                                          'application/octet-stream':fattrs['misc'],
-                                          'application/zip':fattrs['misc'],
-                                          'application/pdf':fattrs['misc'],
+                                  'application/octet-stream':fattrs['misc'],
+                                  'application/zip':fattrs['misc'],
+                                  'application/pdf':fattrs['misc'],
 
-                                          'audio/ogg':fattrs['audio'],
-                                          'audio/mpeg':fattrs['audio'],
+                                  'audio/ogg':fattrs['audio'],
+                                  'audio/mpeg':fattrs['audio'],
 
-                                          'image/jpeg':fattrs['image'],
-                                          'image/gif':fattrs['image'],
+                                  'image/jpeg':fattrs['image'],
+                                  'image/gif':fattrs['image'],
 
-                                          'video/mp4':fattrs['video'],
+                                  'video/mp4':fattrs['video'],
+                                  'video/mpeg':fattrs['video'],
 
-                                          'text/csv;charset=UTF-8':fattrs['text'],
-                                          'text/xml':fattrs['text']})
+                                  'text/csv;charset=UTF-8':fattrs['text'],
+                                  'text/xml':fattrs['text']})
 
         def add_colour(mime_type, name):
 
-            if (mime_to_attrib_map.get(mime_type, None)):
-                return mime_to_attrib_map[mime_type].colour + name + Fore.RESET
+            if (attrib_map.get(mime_type, None)):
+                return attrib_map[mime_type].colour + name + Fore.RESET
             else:
                 return name
 
@@ -160,7 +163,7 @@ class GDriveShell(cmd.Cmd):
             retval = []
 
             if (el.get('mimeType', False)):
-                retval.append(mime_to_attrib_map[el['mimeType']].attrib_char)
+                retval.append(attrib_map[el['mimeType']].attrib_char)
             else:
                 retval.append('-')
 
@@ -178,14 +181,10 @@ class GDriveShell(cmd.Cmd):
         max_len_owner = 1
         res = None
 
-        #if (line):
         res = list(self.path[-1], line)
         if (len(self.path) == 1):
-            #print('poke')
             shared = list_shared_folders().get('files',[])
             res = res + shared
-        #else:
-        #    res = list(self.path[-1]).get('files',[])
 
         res = sorted(res, key=lambda x: x['name'].lower())
 
@@ -207,10 +206,13 @@ class GDriveShell(cmd.Cmd):
 
     def do_mkdir(self, line):
         args = line.split(' ')
-        if (len(args) < 1):
+        if (args[0] == ''):
             print('too few arguments')
         else:
-            print('creating directory {0}'.format(args[0]))
+            res = make_directory(args[0])
+            print('do_mkdir:res: {0}'.format(res))
+            if(not res): #make_directory(args[0])):
+                print('directory exists')
 
 
     def do_mv(self, line):
@@ -225,7 +227,12 @@ class GDriveShell(cmd.Cmd):
         if (len(args) < 2):
             print('too few arguments')
         else:
-            print('renaming {0} to {1}'.format(args[0], args[1]))
+            res = rename_file(args[0], args[1])
+
+            if (res == -1):
+                print('no such file: {0}'.format(args[0]))
+            elif (res == -2):
+                print('ambiguous file name: {0}'.format(args[0]))
 
     def do_rmdir(self, line):
         args = line.split(' ')

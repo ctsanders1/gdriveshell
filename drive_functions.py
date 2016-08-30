@@ -51,6 +51,21 @@ def execute_request(request, params):
     return files
 
 
+def file_exists(name, only_in_cwd=True):
+    global conn
+    global path_id
+
+    params = {'pageSize':1,
+              'fields':'nextPageToken, files(name)'}
+    q = 'name = "{0}"'.format(name)
+
+    if (only_in_cwd):
+        q += ' and "{0}" in parents'.format(path_id[-1])
+
+    params['q'] = q
+
+    return execute_request(conn.files().list, params)
+
 #
 #
 #
@@ -59,28 +74,14 @@ def change_dir(name):
     global cwd_subdirs
     global cwd_id
 
-    #print('debug-cd0: {0}'.format(name))
-
     if(name == '..'):
         if(len(path) > 1):
-            #print('debug-cd00: {0}'.format(path))
-            #print('debug-cd01: {0}'.format(path_id))
             path.pop()
-            parent = path_id.pop()
-            #print('debug-cd02: {0}'.format(path))
-            #print('debug-cd03: {0}'.format(path_id))
-            #print('debug-cd03: {0}'.format(path_id[-1]))
-            
             cwd_subdirs = fetch_subdirs(path_id[-1])
     else:
-        #print('debug-cd1: {0}'.format(path))
-        #print('debug-cd2: {0}'.format(path_id))
         path_id.append(cwd_subdirs[name][0])
         path.append(name)
-        #print('debug-cd3: {0}'.format(path))
-        #print('debug-cd4: {0}'.format(path_id))
-        #print('debug-cd5: {0}'.format(cwd_subdirs[path[-1]]))
-        cwd_subdirs = fetch_subdirs(path_id[-1],path_id[-2]) #cwd_subdirs[path[-1]][0])
+        cwd_subdirs = fetch_subdirs(path_id[-1],path_id[-2])
 
     return path
 
@@ -98,6 +99,12 @@ def change_space(n_space):
 
 def copy_file(source, target):
     pass
+
+def create_file(name, mime_type):
+    params = {'body':{'name':name,
+                      'mimeType':mime_type},
+              'fields':'id'}
+    return conn.files().create(**params).execute()
 
 def enumerate_directories():
     global conn
@@ -147,14 +154,9 @@ def fetch_subdirs(dir,parent=None):
     global conn
     global subdir_map
 
-    #print('dir: ' + dir)
-
     if(subdir_map.get(dir,None)):
-        #print('cache hit')
         return subdir_map[dir]
-    
     else:
-        #print('cache miss')
         q = 'mimeType = "application/vnd.google-apps.folder" and "{0}" in parents'.format(dir)
         params = {'pageSize':1000,
                   'spaces':'drive',
@@ -162,13 +164,11 @@ def fetch_subdirs(dir,parent=None):
         params['q'] = q
         name_id_map = {}
         files = execute_request(conn.files().list, params)
-        #files = conn.files().list(**params).execute().get('files', [])
 
         for file in files:
             name_id_map[file['name']] = [file['id']]
 
         if (dir == DRIVE_ROOT_FOLDER):
-            #print(fetch_shared_dirs())
             name_id_map.update(fetch_shared_dirs())
         else:
             name_id_map['..'] = subdir_map[parent]
@@ -202,10 +202,38 @@ def get_file_by_id(id):
 
 
 def get_file_by_name(name):
-    pass
+    global conn
+    global path_id
+
+    q_tmpl = '{0} in parents and name = {1}'
+    params = {'pageSize':1000,
+              'spaces':'drive',
+              'fields':'nextPageToken, files(id, owners, size, modifiedTime, version, name,' \
+              'parents, mimeType, shared, capabilities)'}
+
+    if(len(cwd) > 0):
+        q += '{0} in parents'.format(cwd)
+    else:
+        q += '{0} in parents'.format(DRIVE_ROOT_FOLDER)
+
+    if(qstring):
+        q += ' and ' + qstring
+
+    params['q'] = q
+
 
 def make_directory(name):
-    pass
+    global cwd_subdirs
+    res = file_exists(name)
+    print('make_directory:file_exists:res: {0}'.format(res))
+    if(res): #file_exists(name)):
+        print('make_directory:false')
+        return False
+    else:
+        res = create_file(name, 'application/vnd.google-apps.folder')
+        print('make_directory:create_file:res: {0}'.format(res))
+        cwd_subdirs[name] = [res['id']]
+        return res
 
 def move_file(source, target):
     pass
@@ -247,12 +275,32 @@ def list_shared_folders():
 
 
 def remove_directory(name):
+    # application/vnd.google-apps.folder
     pass
 
-def rename_file(id, name):
+def rename_file(old_name, new_name):
     global conn
-    
-    return conn.files().update(fileId=id,name=name,fields='id, parents').execute()
+    global path_id
+
+    q_tmpl = '"{0}" in parents and name = "{1}"'
+    params = {'pageSize':1000,
+              'spaces':'drive',
+              'fields':'files(id)'}
+
+    params['q'] = q_tmpl.format(path_id[-1], old_name)
+
+    res = execute_request(conn.files().list, params)
+
+    if (len(res) == 0):
+        return -1
+    elif (len(res) > 1):
+        return -2
+    else:
+        res = conn.files().update(fileId=res[0]['id'],
+                                  body={'name':new_name},
+                                  fields='name').execute()
+        return 0
+
 
     
 #

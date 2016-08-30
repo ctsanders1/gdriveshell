@@ -25,7 +25,7 @@ def get_credentials(csf, scopes, app_name):
     if not os.path.exists(credential_dir):
         os.makedirs(credential_dir)
     credential_path = os.path.join(credential_dir,
-                                   'drive-python-quickstart.json')
+                                   'gdriveshell_credentials.json')
 
     store = oauth2client.file.Storage(credential_path)
     credentials = store.get()
