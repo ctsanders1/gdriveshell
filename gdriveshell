@@ -7,7 +7,8 @@ from pprint import pprint
 from colorama import Back, Fore, init
 
 from drive_functions import debug_info, change_dir, change_space, list, \
-                            list_shared_folders, make_directory, rename_file
+                            list_shared_folders, make_directory, remove_directory, \
+                            rename_file
 
 class GDriveShell(cmd.Cmd):
 
@@ -16,7 +17,7 @@ class GDriveShell(cmd.Cmd):
     default_path = ['']
     path = ['']
     default_prompt = 'GDrive:{0}:/{1} $ '
-    prompt = default_prompt.format(space, '') #default_prompt.format('/'.join(path))
+    prompt = default_prompt.format(space, '')
 
 
 
@@ -37,8 +38,6 @@ class GDriveShell(cmd.Cmd):
 
     def preloop(self):
         init()
-    #    self.cwd_subdirs = fetch_subdirs()
-
 
     #
     # commands
@@ -201,7 +200,8 @@ class GDriveShell(cmd.Cmd):
             f_name = add_colour(el['mimeType'], el['name'])
             print('{0}{1}{2}  {3:<{max_len_o}}  {4}  {5:>{max_len_s}}  {6}'
                   .format(*misc, el['owners'][0]['displayName'], el['modifiedTime'],
-                          el.get('size',0), f_name, max_len_s=max_len_size, max_len_o=max_len_owner))
+                          el.get('size',0), f_name, max_len_s=max_len_size,
+                          max_len_o=max_len_owner))
 
 
     def do_mkdir(self, line):
@@ -210,7 +210,7 @@ class GDriveShell(cmd.Cmd):
             print('too few arguments')
         else:
             res = make_directory(args[0])
-            print('do_mkdir:res: {0}'.format(res))
+            #print('do_mkdir:res: {0}'.format(res))
             if(not res): #make_directory(args[0])):
                 print('directory exists')
 
@@ -234,12 +234,28 @@ class GDriveShell(cmd.Cmd):
             elif (res == -2):
                 print('ambiguous file name: {0}'.format(args[0]))
 
-    def do_rmdir(self, line):
+    def do_rm(self, line):
         args = line.split(' ')
-        if (len(args) < 1):
+        if (args[0] == ''):
             print('too few arguments')
         else:
-            print('removing directory {0}'.format(args[0]))
+            print('deleting {0}'.format(args[0]))
+
+
+    def do_rmdir(self, line):
+        args = line.split(' ')
+        if (args[0] == ''):
+            print('too few arguments')
+        else:
+            #print('removing directory {0}'.format(args[0]))
+            res = remove_directory(args[0])
+            #print('do_rmdir:res: {0}'.format(res))
+
+            if(res == -2):
+                print('directory not empty')
+            elif(res == -1):
+                print('directory does not exist')
+
 
 
     #def do_inspect_file(self, line):

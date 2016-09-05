@@ -56,13 +56,15 @@ def file_exists(name, only_in_cwd=True):
     global path_id
 
     params = {'pageSize':1,
-              'fields':'nextPageToken, files(name)'}
+              'fields':'files(name, id)'}
     q = 'name = "{0}"'.format(name)
 
     if (only_in_cwd):
         q += ' and "{0}" in parents'.format(path_id[-1])
 
     params['q'] = q
+
+    #print(params)
 
     return execute_request(conn.files().list, params)
 
@@ -72,11 +74,11 @@ def file_exists(name, only_in_cwd=True):
 def change_dir(name):
     global path
     global cwd_subdirs
-    global cwd_id
 
     if(name == '..'):
         if(len(path) > 1):
             path.pop()
+            path_id.pop()
             cwd_subdirs = fetch_subdirs(path_id[-1])
     else:
         path_id.append(cwd_subdirs[name][0])
@@ -102,7 +104,8 @@ def copy_file(source, target):
 
 def create_file(name, mime_type):
     params = {'body':{'name':name,
-                      'mimeType':mime_type},
+                      'mimeType':mime_type,
+                      'parents':[path_id[-1]]},
               'fields':'id'}
     return conn.files().create(**params).execute()
 
@@ -224,16 +227,15 @@ def get_file_by_name(name):
 
 def make_directory(name):
     global cwd_subdirs
-    res = file_exists(name)
-    print('make_directory:file_exists:res: {0}'.format(res))
-    if(res): #file_exists(name)):
-        print('make_directory:false')
+
+    if(file_exists(name)):
         return False
     else:
         res = create_file(name, 'application/vnd.google-apps.folder')
-        print('make_directory:create_file:res: {0}'.format(res))
         cwd_subdirs[name] = [res['id']]
+
         return res
+
 
 def move_file(source, target):
     pass
@@ -262,6 +264,7 @@ def list(cwd, qstring=None):
 
     return  execute_request(conn.files().list, params)
 
+
 def list_shared_folders():
     global conn
 
@@ -276,7 +279,26 @@ def list_shared_folders():
 
 def remove_directory(name):
     # application/vnd.google-apps.folder
-    pass
+    global cwd_subdirs
+    res = file_exists(name)
+    #print('remove_directory:file_exists:res: {0}'.format(res))
+    if(res): #file_exists(name)):
+        q = '"{0}" in parents'.format(res[0]['id'])
+        params = {'pageSize':1,
+                  'fields':'files(name, id)',
+                  'q':q}
+
+        if(execute_request(conn.files().list, params)):
+            #print('remove_directory:not_empty')
+            return -2
+        else:
+            #print('remove_directory:delete_file:res: {0}'.format(res))
+            conn.files().delete(fileId=res[0]['id']).execute()
+            del cwd_subdirs[name]
+            return 0
+    else:
+        #print('remove_directory:not_extant')
+        return -1
 
 def rename_file(old_name, new_name):
     global conn
@@ -302,7 +324,8 @@ def rename_file(old_name, new_name):
         return 0
 
 
-    
+def remove_file(name):
+    pass
 #
 #
 #
