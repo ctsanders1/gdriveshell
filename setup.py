@@ -1,9 +1,11 @@
 #!/usr/bin/env python
-from distutils.core import setup
+try:
+    from setuptools import setup
+except ImportError:
+    from distutils.core import setup
 
 setup(
     name = 'gdriveshell',
-    packages = ['gdriveshell'],
     version = '0.0.0',
     description = 'An FTP-style client for Google Drive',
     author = 'Marius Hårstad Bauer-Kjerkreit',
@@ -21,7 +23,7 @@ setup(
         "Development Status :: 3 - Alpha",
         "Environment :: Console",
         "Intended Audience :: End Users/Desktop",
-        "License :: OSI Approved :: BSD 2-Clause",
-        "Programming Language :: Python :: 3"
+        "License :: OSI Approved :: BSD License",
+        "Programming Language :: Python :: 3.5"
     ]
 )
