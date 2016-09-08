@@ -1,25 +1,9 @@
-import os
+def get_credentials(csf, scopes, app_name, app_ver):
+    import os
+    from oauth2client import client,file,tools
+    from argparse import ArgumentParser
 
-import oauth2client
-from oauth2client import client
-from oauth2client import tools
-
-try:
-    import argparse
-    flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
-except ImportError:
-    flags = None
-
-
-def get_credentials(csf, scopes, app_name):
-    """Gets valid user credentials from storage.
-
-    If nothing has been stored, or if the stored credentials are invalid,
-    the OAuth2 flow is completed to obtain the new credentials.
-
-    Returns:
-        Credentials, the obtained credential.
-    """
+    flags = ArgumentParser(parents=[tools.argparser]).parse_args()
     home_dir = os.path.expanduser('~')
     credential_dir = os.path.join(home_dir, '.credentials')
     if not os.path.exists(credential_dir):
@@ -27,14 +11,11 @@ def get_credentials(csf, scopes, app_name):
     credential_path = os.path.join(credential_dir,
                                    'gdriveshell_credentials.json')
 
-    store = oauth2client.file.Storage(credential_path)
+    store = file.Storage(credential_path)
     credentials = store.get()
     if not credentials or credentials.invalid:
         flow = client.flow_from_clientsecrets(csf, scopes)
-        flow.user_agent = app_name
-        if flags:
-            credentials = tools.run_flow(flow, store, flags)
-        else: # Needed only for compatibility with Python 2.6
-            credentials = tools.run(flow, store)
+        flow.user_agent = app_name + '/' + app_ver
+        credentials = tools.run_flow(flow, store, flags)
         print('Storing credentials to ' + credential_path)
     return credentials

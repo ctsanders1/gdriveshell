@@ -1,14 +1,24 @@
 #!/usr/bin/env python
-
 import cmd
+import httplib2
+import logging
+import os
+
 from collections import defaultdict, namedtuple
 from pprint import pprint
 
-from colorama import Back, Fore, init
+from apiclient import discovery
+from colorama import Back, Fore, init as colorama_init
 
 from drive_functions import debug_info, change_dir, change_space, list, \
                             list_shared_folders, make_directory, remove_directory, \
                             rename_file
+
+__author__  = 'Marius Hårstad Bauer-Kjerkreit'
+__program__ = 'GDriveShell'
+__version__ = '0.0.1-alpha'
+
+
 
 class GDriveShell(cmd.Cmd):
 
@@ -37,7 +47,8 @@ class GDriveShell(cmd.Cmd):
         pass
 
     def preloop(self):
-        init()
+        colorama_init()
+        #google_init()
 
     #
     # commands

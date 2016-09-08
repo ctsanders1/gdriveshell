@@ -5,7 +5,6 @@ import logging
 from apiclient import discovery
 
 from config import APPLICATION_NAME, CLIENT_SECRET_FILE, DRIVE_ROOT_FOLDER, SCOPES
-from auth import get_credentials
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -330,7 +329,25 @@ def remove_file(name):
 #
 #
 def generate_drive_connection():
-    credentials = get_credentials(CLIENT_SECRET_FILE, SCOPES, APPLICATION_NAME)
+    import os
+    from oauth2client import client,file,tools
+    from argparse import ArgumentParser
+
+    flags = ArgumentParser(parents=[tools.argparser]).parse_args()
+    home_dir = os.path.expanduser('~')
+    credential_dir = os.path.join(home_dir, '.credentials')
+    if not os.path.exists(credential_dir):
+        os.makedirs(credential_dir)
+    credential_path = os.path.join(credential_dir,
+                                   'gdriveshell_credentials.json')
+
+    store = file.Storage(credential_path)
+    credentials = store.get()
+    if not credentials or credentials.invalid:
+        flow = client.flow_from_clientsecrets(CLIENT_SECRET_FILE, SCOPES)
+        flow.user_agent = APPLICATION_NAME # app_name + '/' + app_ver
+        credentials = tools.run_flow(flow, store, flags)
+        print('Storing credentials to ' + credential_path)
     http = credentials.authorize(httplib2.Http())
 
     return discovery.build('drive', 'v3', http=http)
