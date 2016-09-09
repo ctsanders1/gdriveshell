@@ -7,13 +7,9 @@ import os
 from collections import defaultdict, namedtuple
 from pprint import pprint
 
-
 from colorama import Back, Fore, init as colorama_init
 
 from config import *
-#from drive_functions import debug_info, change_dir, change_space, list, \
-#                            list_shared_folders, make_directory, remove_directory, \
-#                            rename_file
 
 __author__  = 'Marius Hårstad Bauer-Kjerkreit'
 __program__ = 'GDriveShell'
@@ -40,11 +36,6 @@ subdir_map = {}
 #
 #
 def debug_info():
-    global conn
-    global path
-    global cwd_subdirs
-    global subdir_map
-    
     return {'conn':conn,
             'path':path,
             'cwd_subdirs':cwd_subdirs,
@@ -54,7 +45,6 @@ def debug_info():
 # 
 #
 def execute_request(request, params):
-
     res = request(**params).execute()
     files = res.get('files', [])
 
@@ -65,11 +55,7 @@ def execute_request(request, params):
 
     return files
 
-
 def file_exists(name, only_in_cwd=True):
-    global conn
-    global path_id
-
     params = {'pageSize':1,
               'fields':'files(name, id)'}
     q = 'name = "{0}"'.format(name)
@@ -79,15 +65,12 @@ def file_exists(name, only_in_cwd=True):
 
     params['q'] = q
 
-    #print(params)
-
     return execute_request(conn.files().list, params)
 
 #
 #
 #
 def change_dir(name):
-    global path
     global cwd_subdirs
 
     if(name == '..'):
@@ -102,17 +85,14 @@ def change_dir(name):
 
     return path
 
-
 def change_space(n_space):
     global space
-    global spaces
     
     if ({n_space}.issubset(spaces)):
         space = n_space
         return True
     else:
         return False
-    
 
 def copy_file(source, target):
     pass
@@ -149,7 +129,6 @@ def enumerate_directories():
             cwd[folder['name']] = f_dict
             cwd[folder['id']] = f_dict
 
-
 def fetch_shared_dirs():
     global conn
     q = 'mimeType = "application/vnd.google-apps.folder" and sharedWithMe = true'.format(dir)
@@ -166,7 +145,6 @@ def fetch_shared_dirs():
         name_id_map[file['name']] = [file['id']]
    
     return name_id_map
-
 
 def fetch_subdirs(dir,parent=None):
     global conn
@@ -195,7 +173,6 @@ def fetch_subdirs(dir,parent=None):
         
         return name_id_map
 
-
 def get_file(**kwargs):
     pass
 
@@ -218,7 +195,6 @@ def get_file_by_id(id):
     
     return conn.files().list(**params).execute()
 
-
 def get_file_by_name(name):
     global conn
     global path_id
@@ -239,7 +215,6 @@ def get_file_by_name(name):
 
     params['q'] = q
 
-
 def make_directory(name):
     global cwd_subdirs
 
@@ -250,7 +225,6 @@ def make_directory(name):
         cwd_subdirs[name] = [res['id']]
 
         return res
-
 
 def move_file(source, target):
     pass
@@ -279,7 +253,6 @@ def list(cwd, qstring=None):
 
     return  execute_request(conn.files().list, params)
 
-
 def list_shared_folders():
     global conn
 
@@ -291,28 +264,23 @@ def list_shared_folders():
     
     return conn.files().list(**params).execute()
 
-
 def remove_directory(name):
     # application/vnd.google-apps.folder
     global cwd_subdirs
     res = file_exists(name)
-    #print('remove_directory:file_exists:res: {0}'.format(res))
-    if(res): #file_exists(name)):
+    if(res):
         q = '"{0}" in parents'.format(res[0]['id'])
         params = {'pageSize':1,
                   'fields':'files(name, id)',
                   'q':q}
 
         if(execute_request(conn.files().list, params)):
-            #print('remove_directory:not_empty')
             return -2
         else:
-            #print('remove_directory:delete_file:res: {0}'.format(res))
             conn.files().delete(fileId=res[0]['id']).execute()
             del cwd_subdirs[name]
             return 0
     else:
-        #print('remove_directory:not_extant')
         return -1
 
 def rename_file(old_name, new_name):
@@ -337,7 +305,6 @@ def rename_file(old_name, new_name):
                                   body={'name':new_name},
                                   fields='name').execute()
         return 0
-
 
 def remove_file(name):
     pass
@@ -369,20 +336,11 @@ def generate_drive_connection():
 
     return discovery.build('drive', 'v3', http=http)
 
-def google_init():
-    global conn
-    global cwd_subdirs
-    
-    conn = generate_drive_connection()
-    cwd_subdirs = fetch_subdirs(DRIVE_ROOT_FOLDER)
-
-  
   #    /                 #
  #    /                   #
 #    / drive_functions.py  #
  #  /                     #
   #/                     #
-
 
 class GDriveShell(cmd.Cmd):
 
@@ -393,12 +351,9 @@ class GDriveShell(cmd.Cmd):
     default_prompt = 'GDrive:{0}:/{1} $ '
     prompt = default_prompt.format(space, '')
 
-
-
     #
     # overrides
     #
-
     def default(self, line):
         print('Unknown command: {0}'.format(line))
 
@@ -411,23 +366,23 @@ class GDriveShell(cmd.Cmd):
         pass
 
     def preloop(self):
+        global conn
+        global cwd_subdirs
+
         colorama_init()
-        google_init()
+        conn = generate_drive_connection()
+        cwd_subdirs = fetch_subdirs(DRIVE_ROOT_FOLDER)
 
     #
     # commands
     #
-
     def do_debug(self, line):
-        dinfo = debug_info()
-        
         pprint('self.path: {0}'.format(self.path))
-        pprint('path: {0}'.format(dinfo['path']))
-        pprint('conn: {0}'.format(dinfo['conn']))
-        pprint('cwd_subdirs: {0}'.format(dinfo['cwd_subdirs']))
-        pprint('subdir_map: {0}'.format(dinfo['subdir_map']))
+        pprint('path: {0}'.format(path))
+        pprint('conn: {0}'.format(conn))
+        pprint('cwd_subdirs: {0}'.format(cwd_subdirs))
+        pprint('subdir_map: {0}'.format(subdir_map))
         pprint('self.space: {0}'.format(self.space))
-
 
     def do_cd(self, line):
 
@@ -437,9 +392,9 @@ class GDriveShell(cmd.Cmd):
             try:
                 self.path = change_dir(line)
                 self.prompt = self.default_prompt.format(self.space, '/'.join(self.path[1:]))
-            except:
+            except Exception as e:
+                print('Exception: ' + e.__repr__())
                 print('no such directory')
-
 
     def do_cp(self, line):
         args = line.split(' ')
@@ -447,7 +402,6 @@ class GDriveShell(cmd.Cmd):
             print('too few arguments')
         else:
             print('copying {0} to {1}'.format(args[0], args[1]))
-
 
     def do_cs(self, line):
         if (len(line) < 1):
@@ -459,7 +413,6 @@ class GDriveShell(cmd.Cmd):
                self.prompt = self.default_prompt.format(self.space, '/'.join(self.path))
             else:
                 print('no such space')
-               
 
     def do_ls_dev(self, line):
         res = list_shared_folders().get('files',[])
@@ -471,18 +424,16 @@ class GDriveShell(cmd.Cmd):
                   .format(el['owners'][0]['displayName'], el['modifiedTime'],
                           el.get('size',0), el['name']))
 
-
     def do_ln(self, line):
         #
         # vnd.google-apps.symlink
         #
-        
+
         args = line.split(' ')
         if (len(args) < 2):
             print('too few arguments')
         else:
             print('linking {0} to {1}'.format(args[0], args[1]))
-
 
     def do_ls(self, line):
         FAttributes = namedtuple('FAttributes', ['attrib_char','colour'])
@@ -526,12 +477,10 @@ class GDriveShell(cmd.Cmd):
                                   'text/xml':fattrs['text']})
 
         def add_colour(mime_type, name):
-
             if (attrib_map.get(mime_type, None)):
                 return attrib_map[mime_type].colour + name + Fore.RESET
             else:
                 return name
-
 
         def encode_misc_attribs(file):
             retval = []
@@ -549,7 +498,6 @@ class GDriveShell(cmd.Cmd):
             retval.append('-')
 
             return retval
-
 
         max_len_size = 1
         max_len_owner = 1
@@ -578,17 +526,13 @@ class GDriveShell(cmd.Cmd):
                           el.get('size',0), f_name, max_len_s=max_len_size,
                           max_len_o=max_len_owner))
 
-
     def do_mkdir(self, line):
         args = line.split(' ')
         if (args[0] == ''):
             print('too few arguments')
         else:
-            res = make_directory(args[0])
-            #print('do_mkdir:res: {0}'.format(res))
-            if(not res): #make_directory(args[0])):
+            if(make_directory(args[0])):
                 print('directory exists')
-
 
     def do_mv(self, line):
         args = line.split(' ')
@@ -616,35 +560,27 @@ class GDriveShell(cmd.Cmd):
         else:
             print('deleting {0}'.format(args[0]))
 
-
     def do_rmdir(self, line):
         args = line.split(' ')
         if (args[0] == ''):
             print('too few arguments')
         else:
-            #print('removing directory {0}'.format(args[0]))
             res = remove_directory(args[0])
-            #print('do_rmdir:res: {0}'.format(res))
 
             if(res == -2):
                 print('directory not empty')
             elif(res == -1):
                 print('directory does not exist')
 
-
-
-    #def do_inspect_file(self, line):
-        
+    def do_inspect_file(self, line):
+        pass
 
     def do_quit(self, line):
         return True
-
 
     def do_exit(self, line):
         return True
 
 
-
 if __name__ == '__main__':
     GDriveShell().cmdloop()
-    
