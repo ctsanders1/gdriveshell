@@ -6,6 +6,7 @@ __version__ = '0.0.1-alpha'
 __CLIENT_ID__  = ''
 __CLIENT_SEC__ = ''
 
+DRIVE_ROOT_FOLDER= '0AI004NBMVs0mUk9PVA'
 
 import cmd
 import httplib2
@@ -17,7 +18,6 @@ from pprint import pprint
 
 from colorama import Back, Fore, init as colorama_init
 
-from config import *
 
   #                  #
  #                    #
@@ -168,7 +168,7 @@ def fetch_subdirs(dir,parent=None):
         for file in files:
             name_id_map[file['name']] = [file['id']]
 
-        if (dir == DRIVE_ROOT_FOLDER):
+        if (dir == path_id[0]): #DRIVE_ROOT_FOLDER):
             name_id_map.update(fetch_shared_dirs())
         else:
             name_id_map['..'] = subdir_map[parent]
