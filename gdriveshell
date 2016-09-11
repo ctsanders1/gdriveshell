@@ -108,31 +108,6 @@ def create_file(name, mime_type):
               'fields':'id'}
     return conn.files().create(**params).execute()
 
-def enumerate_directories():
-    global conn
-    global dir_tree
-
-    q_tmpl = 'mimeType = "application/vnd.google-apps.folder" and "{0}" in parents'
-    params = {'pageSize':1000,
-              'spaces':'drive',
-              'fields':'nextPageToken, files(id, name)'}
-    stack = [DRIVE_ROOT_FILDER]
-    retval = {'..':None}
-    retval['..'] = retval
-    cwd = retval
-
-    while (stack):
-        node = stack.pop(0)
-        cwd = cwd.get(node,cwd)
-        q = q_tmpl.format(node)
-        params['q'] = q
-
-        for folder in execute_request(conn.files().list, params):
-            stack.append(folder['id'])
-            f_dict = {'..':cwd}
-            cwd[folder['name']] = f_dict
-            cwd[folder['id']] = f_dict
-
 def fetch_shared_dirs():
     global conn
     q = 'mimeType = "application/vnd.google-apps.folder" and sharedWithMe = true'.format(dir)
