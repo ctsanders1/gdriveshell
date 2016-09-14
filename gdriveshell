@@ -3,11 +3,6 @@ __author__  = 'Marius Hårstad Bauer-Kjerkreit'
 __program__ = 'GDriveShell'
 __version__ = '0.0.1-alpha'
 
-__CLIENT_ID__  = ''
-__CLIENT_SEC__ = ''
-
-DRIVE_ROOT_FOLDER= '0AI004NBMVs0mUk9PVA'
-
 import cmd
 import httplib2
 import logging
@@ -18,32 +13,62 @@ from pprint import pprint
 
 from colorama import Back, Fore, init as colorama_init
 
+__CLIENT_ID__  = None
+__CLIENT_SEC__ = None
 
-  #                  #
- #                    #
-#  drive_functions.py  #
- #                    #
-  #                  #
+__CONFIG_FOLDER__ = None
 
-conn = None
-path = ['']
-path_id = [DRIVE_ROOT_FOLDER]
-cwd_subdirs = None
-cwd_id = None
-spaces = {'drive',
+__CONN__ = None
+__PATH__ = ['']
+__PATH_ID__ = ['root']
+__CWD_SUBDIRS__ = None
+__SPACES__ = {'drive',
           'appDataFolder',
           'photos'}
-space = 'drive'
-subdir_map = {}
+__SPACE__ = 'drive'
+__SUBDIR_MAP__ = {}
+
+
+#
+# utility functions
+#
+
+def load_config():
+    import sys
+    from os.path import exists, expanduser, join
+    from configparser import ConfigParser
+
+    global __CONFIG_FOLDER__
+    global __CLIENT_ID__
+    global __CLIENT_SEC__
+
+    __CONFIG_FOLDER__ = join(expanduser('~'), '.gdriveshell')
+    cfg_file = __CONFIG_FOLDER__ + '/config'
+
+    if not exists(__CONFIG_FOLDER__):
+        os.makedirs(__CONFIG_FOLDER__)
+        print('created config dir: ' + __CONFIG_FOLDER__ +
+              '\nplease create the file "' + cfg_file + '"')
+        sys.exit(0)
+    else:
+        if not exists(cfg_file):
+            print('missing config file "' + cfg_file + '"' + '\nplease create...')
+            sys.exit(1)
+        else:
+            cfg = ConfigParser()
+            cfg.read(cfg_file)
+            __CLIENT_ID__ = cfg['auth']['client_id']
+            __CLIENT_SEC__ = cfg['auth']['client_sec']
+
 
 #
 #
 #
 def debug_info():
-    return {'conn':conn,
-            'path':path,
-            'cwd_subdirs':cwd_subdirs,
-            'subdir_map':subdir_map}
+    return {'__CONN__':__CONN__,
+            '__PATH__':__PATH__,
+            '__CWD_SUBDIRS__':__CWD_SUBDIRS__,
+            '__SUBDIR_MAP__':__SUBDIR_MAP__}
 
 #
 # 
@@ -65,35 +90,35 @@ def file_exists(name, only_in_cwd=True):
     q = 'name = "{0}"'.format(name)
 
     if (only_in_cwd):
-        q += ' and "{0}" in parents'.format(path_id[-1])
+        q += ' and "{0}" in parents'.format(__PATH_ID__[-1])
 
     params['q'] = q
 
-    return execute_request(conn.files().list, params)
+    return execute_request(__CONN__.files().list, params)
 
 #
 #
 #
 def change_dir(name):
-    global cwd_subdirs
+    global __CWD_SUBDIRS__
 
     if(name == '..'):
-        if(len(path) > 1):
-            path.pop()
-            path_id.pop()
-            cwd_subdirs = fetch_subdirs(path_id[-1])
+        if(len(__PATH__) > 1):
+            __PATH__.pop()
+            __PATH_ID__.pop()
+            __CWD_SUBDIRS__ = fetch_subdirs(__PATH_ID__[-1])
     else:
-        path_id.append(cwd_subdirs[name][0])
-        path.append(name)
-        cwd_subdirs = fetch_subdirs(path_id[-1],path_id[-2])
+        __PATH_ID__.append(__CWD_SUBDIRS__[name][0])
+        __PATH__.append(name)
+        __CWD_SUBDIRS__ = fetch_subdirs(__PATH_ID__[-1],__PATH_ID__[-2])
 
-    return path
+    return __PATH__
 
 def change_space(n_space):
-    global space
+    global __SPACE__
     
-    if ({n_space}.issubset(spaces)):
-        space = n_space
+    if ({n_space}.issubset(__SPACES__)):
+        __SPACE__ = n_space
         return True
     else:
         return False
@@ -104,21 +129,21 @@ def copy_file(source, target):
 def create_file(name, mime_type):
     params = {'body':{'name':name,
                       'mimeType':mime_type,
-                      'parents':[path_id[-1]]},
+                      'parents':[__PATH_ID__[-1]]},
               'fields':'id'}
-    return conn.files().create(**params).execute()
+    return __CONN__.files().create(**params).execute()
 
 def fetch_shared_dirs():
-    global conn
+    global __CONN__
     q = 'mimeType = "application/vnd.google-apps.folder" and sharedWithMe = true'.format(dir)
     params = {'pageSize':1000,
-              'spaces':'drive',
+              'spaces':__SPACE__,
               'q':q,
               'fields':'nextPageToken, files(id, name)'}
 
     name_id_map = {}
     files = filter(lambda x: x.get('parents', True),
-                   conn.files().list(**params).execute().get('files', []))
+                   __CONN__.files().list(**params).execute().get('files', []))
 
     for file in files:
         name_id_map[file['name']] = [file['id']]
@@ -126,29 +151,29 @@ def fetch_shared_dirs():
     return name_id_map
 
 def fetch_subdirs(dir,parent=None):
-    global conn
-    global subdir_map
+    #global __CONN__
+    global __SUBDIR_MAP__
 
-    if(subdir_map.get(dir,None)):
-        return subdir_map[dir]
+    if(__SUBDIR_MAP__.get(dir,None)):
+        return __SUBDIR_MAP__[dir]
     else:
         q = 'mimeType = "application/vnd.google-apps.folder" and "{0}" in parents'.format(dir)
         params = {'pageSize':1000,
-                  'spaces':'drive',
+                  'spaces':__SPACE__,
                   'fields':'nextPageToken, files(id, name)'}
         params['q'] = q
         name_id_map = {}
-        files = execute_request(conn.files().list, params)
+        files = execute_request(__CONN__.files().list, params)
 
         for file in files:
             name_id_map[file['name']] = [file['id']]
 
-        if (dir == path_id[0]): #DRIVE_ROOT_FOLDER):
+        if (dir == __PATH_ID__[0]): #__DRIVE_ROOT_FOLDER__):
             name_id_map.update(fetch_shared_dirs())
         else:
-            name_id_map['..'] = subdir_map[parent]
+            name_id_map['..'] = __SUBDIR_MAP__[parent]
 
-        subdir_map[dir] = name_id_map
+        __SUBDIR_MAP__[dir] = name_id_map
         
         return name_id_map
 
@@ -158,36 +183,36 @@ def get_file(**kwargs):
 def get_file_by_id(id):
     q = ''
     params = {'pageSize':1000,
-              'spaces':'drive',
+              'spaces':__SPACE__,
               'fields':'nextPageToken, files(id, owners, size, modifiedTime, version, name,' \
               'parents, mimeType, shared, capabilities)'}
 
     if(len(cwd) > 0):
         q += '{0} in parents'.format(cwd)
     else:
-        q += '{0} in parents'.format(DRIVE_ROOT_FOLDER)
+        q += '{0} in parents'.format(path_id[0]) #__DRIVE_ROOT_FOLDER__)
 
     if(qstring):
         q += ' and ' + qstring
 
     params['q'] = q
     
-    return conn.files().list(**params).execute()
+    return __CONN__.files().list(**params).execute()
 
 def get_file_by_name(name):
-    global conn
-    global path_id
+    global __CONN__
+    global __PATH_ID__
 
     q_tmpl = '{0} in parents and name = {1}'
     params = {'pageSize':1000,
-              'spaces':'drive',
+              'spaces':__SPACE__,
               'fields':'nextPageToken, files(id, owners, size, modifiedTime, version, name,' \
               'parents, mimeType, shared, capabilities)'}
 
     if(len(cwd) > 0):
         q += '{0} in parents'.format(cwd)
     else:
-        q += '{0} in parents'.format(DRIVE_ROOT_FOLDER)
+        q += '{0} in parents'.format(__PATH_ID__[0]) #__DRIVE_ROOT_FOLDER__)
 
     if(qstring):
         q += ' and ' + qstring
@@ -195,13 +220,13 @@ def get_file_by_name(name):
     params['q'] = q
 
 def make_directory(name):
-    global cwd_subdirs
+    global __CWD_SUBDIRS__
 
     if(file_exists(name)):
         return False
     else:
         res = create_file(name, 'application/vnd.google-apps.folder')
-        cwd_subdirs[name] = [res['id']]
+        __CWD_SUBDIRS__[name] = [res['id']]
 
         return res
 
@@ -212,40 +237,40 @@ def link_file(source, target):
     pass
 
 def list(cwd, qstring=None):
-    global conn
+    global __CONN__
 
     q = ''
     params = {'pageSize':1000,
-              'spaces':space,
+              'spaces':__SPACE__,
               'fields':'nextPageToken, files(id, owners, size, modifiedTime, version, name,' \
               'parents, mimeType, shared, capabilities)'}
 
     if(len(cwd) > 0):
-        q += '"{0}" in parents'.format(path_id[-1])
+        q += '"{0}" in parents'.format(__PATH_ID__[-1])
     else:
-        q += '"{0}" in parents'.format(DRIVE_ROOT_FOLDER)
+        q += '"{0}" in parents'.format(__PATH_ID__[0]) #__DRIVE_ROOT_FOLDER__)
 
     if(qstring):
         q += ' and ' + qstring
 
     params['q'] = q
 
-    return  execute_request(conn.files().list, params)
+    return  execute_request(__CONN__.files().list, params)
 
 def list_shared_folders():
-    global conn
+    global __CONN__
 
     params = {'pageSize':1000,
-              'spaces':space,
+              'spaces':__SPACE__,
               'q':'mimeType = "application/vnd.google-apps.folder" and sharedWithMe = true',
               'fields':'nextPageToken, files(id, owners, size, modifiedTime, version, name,' \
               'parents, mimeType, shared, capabilities)'}
     
-    return conn.files().list(**params).execute()
+    return __CONN__.files().list(**params).execute()
 
 def remove_directory(name):
     # application/vnd.google-apps.folder
-    global cwd_subdirs
+    global __CWD_SUBDIRS__
     res = file_exists(name)
     if(res):
         q = '"{0}" in parents'.format(res[0]['id'])
@@ -253,34 +278,34 @@ def remove_directory(name):
                   'fields':'files(name, id)',
                   'q':q}
 
-        if(execute_request(conn.files().list, params)):
+        if(execute_request(__CONN__.files().list, params)):
             return -2
         else:
-            conn.files().delete(fileId=res[0]['id']).execute()
-            del cwd_subdirs[name]
+            __CONN__.files().delete(fileId=res[0]['id']).execute()
+            del __CWD_SUBDIRS__[name]
             return 0
     else:
         return -1
 
 def rename_file(old_name, new_name):
-    global conn
-    global path_id
+    global __CONN__
+    global __PATH_ID__
 
     q_tmpl = '"{0}" in parents and name = "{1}"'
     params = {'pageSize':1000,
-              'spaces':'drive',
+              'spaces':__SPACE__,
               'fields':'files(id)'}
 
-    params['q'] = q_tmpl.format(path_id[-1], old_name)
+    params['q'] = q_tmpl.format(__PATH_ID__[-1], old_name)
 
-    res = execute_request(conn.files().list, params)
+    res = execute_request(__CONN__.files().list, params)
 
     if (len(res) == 0):
         return -1
     elif (len(res) > 1):
         return -2
     else:
-        res = conn.files().update(fileId=res[0]['id'],
+        res = __CONN__.files().update(fileId=res[0]['id'],
                                   body={'name':new_name},
                                   fields='name').execute()
         return 0
@@ -300,11 +325,7 @@ def generate_drive_connection():
     from oauth2client.tools import run_flow
 
     flags = ArgumentParser(parents=[tools.argparser]).parse_args()
-    home_dir = os.path.expanduser('~')
-    credential_dir = os.path.join(home_dir, '.gdriveshell')
-    if not os.path.exists(credential_dir):
-        os.makedirs(credential_dir)
-    credential_path = os.path.join(credential_dir, 'credentials.json')
+    credential_path = os.path.join(__CONFIG_FOLDER__, 'credentials')
 
     store = file.Storage(credential_path)
     credentials = store.get()
@@ -316,17 +337,10 @@ def generate_drive_connection():
                 scope=['https://www.googleapis.com/auth/drive'],
                 user_agent=__program__ + '/' + __version__),
             store, flags)
-        credentials = tools.run_flow(flow, store, flags)
         print('Storing credentials to ' + credential_path)
     http = credentials.authorize(httplib2.Http())
 
     return discovery.build('drive', 'v3', http=http)
-
-  #    /                 #
- #    /                   #
-#    / drive_functions.py  #
- #  /                     #
-  #/                     #
 
 class GDriveShell(cmd.Cmd):
 
@@ -352,22 +366,24 @@ class GDriveShell(cmd.Cmd):
         pass
 
     def preloop(self):
-        global conn
-        global cwd_subdirs
+        global __CONN__
+        global __CWD_SUBDIRS__
 
+        load_config()
         colorama_init()
-        conn = generate_drive_connection()
-        cwd_subdirs = fetch_subdirs(DRIVE_ROOT_FOLDER)
+        __CONN__ = generate_drive_connection()
+        __CWD_SUBDIRS__ = fetch_subdirs(__PATH_ID__[0]) #__DRIVE_ROOT_FOLDER__)
+
 
     #
     # commands
     #
     def do_debug(self, line):
         pprint('self.path: {0}'.format(self.path))
-        pprint('path: {0}'.format(path))
-        pprint('conn: {0}'.format(conn))
-        pprint('cwd_subdirs: {0}'.format(cwd_subdirs))
-        pprint('subdir_map: {0}'.format(subdir_map))
+        pprint('__PATH__: {0}'.format(__PATH__))
+        pprint('__CONN__: {0}'.format(__CONN__))
+        pprint('__CWD_SUBDIRS__: {0}'.format(__CWD_SUBDIRS__))
+        pprint('__SUBDIR_MAP__: {0}'.format(__SUBDIR_MAP__))
         pprint('self.space: {0}'.format(self.space))
 
     def do_cd(self, line):
