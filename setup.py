@@ -6,19 +6,19 @@ except ImportError:
 
 setup(
     name = 'gdriveshell',
-    version = '0.0.2a0',
+    version = '0.0.3a0',
     description = 'An FTP-style client for Google Drive',
     author = 'Marius Hårstad Bauer-Kjerkreit',
     author_email = 'mkjerkreit@gmail.com',
     url = 'https://github.com/thingol/gdriveshell',
-    download_url = 'https://github.com/thingol/gdriveshell/archive/0.0.2a0.tar.gz',
+    download_url = 'https://github.com/thingol/gdriveshell/archive/0.0.3a0.tar.gz',
     license = 'BSD 2-Clause',
     keywords = ['google', 'drive', 'ftp', 'shell'],
     scripts = ['gdriveshell'],
     install_requires = [
         'httplib2',
         'google-api-python-client',
-        'oauth2client'
+        'colorama'
     ],
     classifiers = [
         "Development Status :: 3 - Alpha",
