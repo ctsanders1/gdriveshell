@@ -15,8 +15,8 @@ $ easy_install --upgrade gdriveshell
 # Authentication
 
 OAuth2 is used for authenticating against Google. The resulting token is placed in the
-~/.gdriveshell/credentials file. When you first start gdriveshell the authentication process will
-proceed.
+~/.gdriveshell/credentials file. When you first start gdriveshell the authentication
+process will proceed.
 
 * Go to the Google developer console
 * Create a new project for gdriveshell
@@ -28,6 +28,7 @@ proceed.
 * Pick a suitable name as for your credentials.
 * The consent screen requires a "Product name" but is otherwise not important.
 * Put your id and secret in the folder ~/.gdriveshell/config
+
     [auth]
     client_id = <your id>
     client_sec = <your secret>
