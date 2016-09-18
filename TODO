@@ -1,0 +1,2 @@
+* add ability to decode paths, relative and absolute
+* rewrite: encapsulate state with a bit 'o oo 
