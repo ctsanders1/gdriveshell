@@ -34,18 +34,6 @@ class DriveConnection:
         self._connect()
         self.__cwd_subdirs = self._fetch_subdirs(self.__path_id[0])
 
-    def _decode_path(self, path):
-        folders = path.rstrip('/').split('/')
-        subdirs = None
-
-        if (folders[0] == ''):
-            subdirs = self._fetch_subdirs('root')
-        else:
-            subdirs = self._fetch_subdirs(folders[0],self.__path_id[-1])
-
-        for folder in folders[1:-1]:
-            subdirs = self._fetch_subdirs(folder,subdirs['..'])
-
     def _connect(self):
         import os
         from apiclient import discovery
@@ -98,6 +86,20 @@ class DriveConnection:
 #
 #
 #
+    def _decode_path(self, path):
+        folders = path.rstrip('/').split('/')
+        subdirs = None
+
+        print(folders)
+        if (folders[0] == ''):
+            subdirs = self._fetch_subdirs('root')
+        else:
+            subdirs = self._fetch_subdirs(self.__cwd_subdirs[folders[0]][0],self.__path_id[-1])
+
+        print(subdirs)
+        for folder in folders[1:-1]:
+            subdirs = self._fetch_subdirs(subdirs[folder],subdirs['..'])
+
     def _execute_request(self, request, params):
         res = request(**params).execute()
         files = res.get('files', [])
@@ -108,6 +110,49 @@ class DriveConnection:
             files += res.get('files', [])
 
         return files
+
+    def _fetch_shared_dirs(self):
+
+        q = 'mimeType = "application/vnd.google-apps.folder" and sharedWithMe = true'.format(dir)
+        params = {'pageSize': 1000,
+                  'spaces': self.__space,
+                  'q': q,
+                  'fields': 'nextPageToken, files(id, name)'}
+
+        name_id_map = {}
+        files = filter(lambda x: x.get('parents', True),
+                       self.__conn.files().list(**params).execute().get('files', []))
+
+        for file in files:
+            name_id_map[file['name']] = [file['id']]
+
+        return name_id_map
+
+    def _fetch_subdirs(self, dir,parent=None):
+
+        if (dir in self.__subdir_map): #.get(dir, None)):
+            return self.__subdir_map[dir]
+        else:
+            q = 'mimeType = "application/vnd.google-apps.folder" and "{0}" in parents'.format(dir)
+            params = {'pageSize': 1000,
+                      'spaces': self.__space,
+                      'fields': 'nextPageToken, files(id, name)',
+                      'q': q}
+            name_id_map = {}
+            files = self._execute_request(self.__conn.files().list, params)
+
+            for file in files:
+                name_id_map[file['name']] = [file['id']]
+
+            if (dir == self.__path_id[0]):
+                name_id_map.update(self._fetch_shared_dirs())
+                name_id_map['..'] = None
+            else:
+                name_id_map['..'] = self.__subdir_map[parent]
+
+            self.__subdir_map[dir] = name_id_map
+
+            return name_id_map
 
     def _file_exists(self, name, only_in_cwd=True):
         params = {'pageSize': 1,
@@ -159,50 +204,6 @@ class DriveConnection:
                            'parents': [self.__path_id[-1]]},
                   'fields': 'id'}
         return self.__conn.files().create(**params).execute()
-
-
-    def _fetch_shared_dirs(self):
-
-        q = 'mimeType = "application/vnd.google-apps.folder" and sharedWithMe = true'.format(dir)
-        params = {'pageSize': 1000,
-                  'spaces': self.__space,
-                  'q': q,
-                  'fields': 'nextPageToken, files(id, name)'}
-
-        name_id_map = {}
-        files = filter(lambda x: x.get('parents', True),
-                       self.__conn.files().list(**params).execute().get('files', []))
-
-        for file in files:
-            name_id_map[file['name']] = [file['id']]
-
-        return name_id_map
-
-
-    def _fetch_subdirs(self, dir,parent=None):
-
-        if (self.__subdir_map.get(dir, None)):
-            return self.__subdir_map[dir]
-        else:
-            q = 'mimeType = "application/vnd.google-apps.folder" and "{0}" in parents'.format(dir)
-            params = {'pageSize': 1000,
-                      'spaces': self.__space,
-                      'fields': 'nextPageToken, files(id, name)',
-                      'q': q}
-            name_id_map = {}
-            files = self._execute_request(self.__conn.files().list, params)
-
-            for file in files:
-                name_id_map[file['name']] = [file['id']]
-
-            if (dir == self.__path_id[0]):
-                name_id_map.update(self._fetch_shared_dirs())
-            else:
-                name_id_map['..'] = self.__subdir_map[parent]
-
-            self.__subdir_map[dir] = name_id_map
-
-            return name_id_map
 
 
     def get_file(self, **kwargs):
