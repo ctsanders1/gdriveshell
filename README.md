@@ -29,9 +29,11 @@ process will proceed.
 * The consent screen requires a "Product name" but is otherwise not important.
 * Put your id and secret in the folder ~/.gdriveshell/config
 
+```
     [auth]
-    client_id = <your id>
-    client_sec = <your secret>
+      client_id = <your id>
+      client_sec = <your secret>
+```
 
 # Python Version
 Developed using 3.5.1
